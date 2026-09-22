@@ -2,18 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Settings, FileText, Plus, LogOut, Upload, Printer, ChevronRight, 
-  Plane, User, Briefcase, Calendar, Clock, MapPin, CheckCircle2, AlertCircle, X, Trash2, Wand2, Loader2, Image as ImageIcon, FileBadge2
+  Plane, User, Briefcase, Calendar, Clock, MapPin, CheckCircle2, AlertCircle, X, Trash2, Wand2, Loader2, Image as ImageIcon
 } from 'lucide-react';
 
 // --- Supabase Initialization ---
-const supabaseUrl = 'https://szhltfawxvkouavvxhzb.supabase.co'; 
-const supabaseKey = 'sb_publishable_qTryF-iKLsMRJy7-pDdAwg_2TBQnu99'; 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const DEFAULT_SETTINGS = {
-  agencyName: 'VisaEx',
+  agencyName: 'VisaEx Travel Agency',
   phone: '+880 1711 399220',
-  address: 'Ali Bhaban (Ground Floor), Majumdari, Amberkhana, Sylhet',
+  address: 'Majumdari, Sylhet',
   regNo: '12340052129',
   primaryColor: '#0b1b3d',
   fontFamily: 'Inter, sans-serif',
@@ -25,7 +25,7 @@ const DEFAULT_SETTINGS = {
 const DEFAULT_PASSENGER = { name: '', type: 'Adult', ticketNo: '' };
 const DEFAULT_SEGMENT = {
   airline: '',
-  airlineLogo: '', 
+  airlineLogo: '',
   flightNo: '',
   depCity: '',
   depCode: '',
@@ -49,12 +49,6 @@ const DEFAULT_TICKET = {
   eTicketNo: '',
   passengers: [{ ...DEFAULT_PASSENGER }],
   segments: [{ ...DEFAULT_SEGMENT }],
-  fareDetails: {
-    currency: 'USD',
-    baseFare: '',
-    taxes: '',
-    total: ''
-  },
   importantNotes: [
     'Please arrive at the airport at least 3 hours prior to departure.',
     'Passengers must provide valid ID used to purchase their ticket.',
@@ -62,9 +56,8 @@ const DEFAULT_TICKET = {
   ]
 };
 
-// UI Components
 const Input = ({ label, value, onChange, placeholder, type = "text", required = false }) => (
-  <div className="flex flex-col gap-1.5 mb-4 w-full">
+  <div className="flex flex-col gap-1.5 mb-4">
     {label && <label className="text-xs font-semibold tracking-wide text-slate-600 uppercase">{label}</label>}
     <input
       type={type}
@@ -105,28 +98,26 @@ export default function App() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [currentView, setCurrentView] = useState('generator');
 
-  // Initialize Supabase Auth
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (!session) setCurrentView('login');
+      else setCurrentView('generator');
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (!session) {
-        setCurrentView('login');
-      }
-      // Fixed: Removed the 'else setCurrentView('generator')' line which caused the tab-switch bug
+      if (!session) setCurrentView('login');
+      else setCurrentView('generator');
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch Settings
   useEffect(() => {
     if (!user) return;
+    
     const fetchSettings = async () => {
       try {
         const { data, error } = await supabase
@@ -142,6 +133,7 @@ export default function App() {
         console.error("Fetch exception:", err);
       }
     };
+
     fetchSettings();
   }, [user]);
 
@@ -166,31 +158,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row font-sans text-slate-900 selection:bg-slate-200">
-      
-      {/* Dynamic CSS Variables and Robust Print CSS */}
       <style>{`
         :root {
           --agency-primary: ${settings.primaryColor};
           --agency-font: '${settings.fontFamily.split(',')[0].replace(/'/g, '')}', sans-serif;
         }
         @media print {
-          body * { visibility: hidden; }
-          #print-area, #print-area * { visibility: visible; }
-          #print-area { 
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 100%; 
-            background-color: white !important; 
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact;
-          }
-          @page { margin: 0; size: A4; }
+          body { background-color: white !important; }
           .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          @page { margin: 0; size: A4; }
         }
       `}</style>
 
-      {/* Sidebar Navigation */}
       <aside className="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col no-print">
         <div className="p-6 border-b border-slate-100">
           <h1 className="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
@@ -224,16 +204,10 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto relative no-print">
         {currentView === 'admin' && <AdminView settings={settings} user={user} />}
         {currentView === 'generator' && <GeneratorView settings={settings} />}
       </main>
-
-      {/* Print Wrapper */}
-      <div id="print-area" className="hidden print:block absolute inset-0 z-[9999] bg-white">
-        {currentView === 'generator' && <TicketDocument settings={settings} data={DEFAULT_TICKET} isPrintMode={true} />}
-      </div>
     </div>
   );
 }
@@ -262,8 +236,15 @@ const LoginView = () => {
     e.preventDefault();
     setIsLoggingIn(true);
     setError('');
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) setError(authError.message);
+    
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      setError(authError.message);
+    }
     setIsLoggingIn(false);
   };
 
@@ -346,7 +327,7 @@ const AdminView = ({ settings, user }) => {
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
       console.error(error);
-      setSaveMessage('Error saving settings.');
+      setSaveMessage('Error saving settings. Check RLS policies.');
     }
     setIsSaving(false);
   };
@@ -476,31 +457,20 @@ const GeneratorView = ({ settings }) => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
 
-  // Ensures print mode accesses the absolute latest state
-  useEffect(() => {
-    const printArea = document.getElementById('print-area');
-    if (printArea) {
-      import('react-dom/client').then(ReactDOM => {
-        const root = ReactDOM.createRoot(printArea);
-        root.render(<TicketDocument settings={settings} data={ticketData} isPrintMode={true} />);
-      });
-    }
-  }, [ticketData, settings]);
-
   const updateField = (field, value) => setTicketData(prev => ({ ...prev, [field]: value }));
-  const updateFareField = (field, value) => setTicketData(prev => ({ ...prev, fareDetails: { ...prev.fareDetails, [field]: value } }));
   
   const updateArrayItem = (arrayName, index, field, value) => {
     setTicketData(prev => {
       const newArray = [...prev[arrayName]];
       newArray[index] = { ...newArray[index], [field]: value };
 
-      // Re-evaluate Airline Logo Matching immediately on type
       if (arrayName === 'segments' && field === 'airline') {
         const matchedAirline = (settings.airlines || []).find(
           a => a.name.toLowerCase().trim() === value.toLowerCase().trim()
         );
-        newArray[index].airlineLogo = matchedAirline ? matchedAirline.logo : '';
+        if (matchedAirline) {
+          newArray[index].airlineLogo = matchedAirline.logo;
+        }
       }
 
       return { ...prev, [arrayName]: newArray };
@@ -515,30 +485,28 @@ const GeneratorView = ({ settings }) => {
     setTicketData(prev => ({ ...prev, [arrayName]: prev[arrayName].filter((_, i) => i !== index) }));
   };
 
-  const handleImportantNoteChange = (index, value) => {
-    setTicketData(prev => {
-      const newNotes = [...prev.importantNotes];
-      newNotes[index] = value;
-      return { ...prev, importantNotes: newNotes };
-    });
+  const handleAirlineLogoUpload = (e, index) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => updateArrayItem('segments', index, 'airlineLogo', reader.result);
+      reader.readAsDataURL(file);
+    }
   };
-  const addImportantNote = () => setTicketData(prev => ({ ...prev, importantNotes: [...prev.importantNotes, ''] }));
-  const removeImportantNote = (index) => setTicketData(prev => ({ ...prev, importantNotes: prev.importantNotes.filter((_, i) => i !== index) }));
 
   const processAIExtraction = async (fileBase64 = null, mimeType = null) => {
     if (!aiInputText.trim() && !fileBase64) return;
     setIsAiLoading(true);
     setAiError('');
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
-      // Updated to 1.5-flash which natively handles images AND PDFs inline
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ''; 
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
       
       const payload = {
         contents: [{
           role: "user",
           parts: [
-            { text: "Extract flight ticket information from the provided itinerary (text, image, or PDF) and return a strictly formatted JSON object matching the requested schema. Extrapolate missing baggage info based on standard economy allowances if necessary. Convert dates to 'Day, Mon DD, YYYY' format." }
+            { text: "Extract flight ticket information from the provided itinerary (text or image) and return a strictly formatted JSON object matching the requested schema. Extrapolate missing baggage info based on standard economy allowances if necessary." }
           ]
         }],
         generationConfig: {
@@ -569,10 +537,6 @@ const GeneratorView = ({ settings }) => {
                   }
                 }
               },
-              fareDetails: {
-                type: "OBJECT",
-                properties: { currency: { type: "STRING" }, baseFare: { type: "STRING" }, taxes: { type: "STRING" }, total: { type: "STRING" } }
-              },
               importantNotes: { type: "ARRAY", items: { type: "STRING" } }
             }
           }
@@ -601,7 +565,6 @@ const GeneratorView = ({ settings }) => {
         const jsonText = result.candidates[0].content.parts[0].text;
         const parsedData = JSON.parse(jsonText);
         
-        // Auto-match airline logos from the parsed segments
         if (parsedData.segments && settings.airlines) {
            parsedData.segments = parsedData.segments.map(seg => {
              const matchedAirline = settings.airlines.find(a => a.name.toLowerCase().trim() === seg.airline?.toLowerCase().trim());
@@ -617,7 +580,7 @@ const GeneratorView = ({ settings }) => {
       }
     } catch (err) {
       console.error("AI parsing error:", err);
-      setAiError("An error occurred during extraction. Check your Vercel Environment Variables for the Gemini API Key.");
+      setAiError("An error occurred during extraction. Please check your Gemini API key.");
     }
     setIsAiLoading(false);
   };
@@ -634,15 +597,13 @@ const GeneratorView = ({ settings }) => {
 
   return (
     <div className="h-full flex flex-col md:flex-row relative">
-      
-      {/* AI Modal */}
       {isAIModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-md shadow-2xl max-w-lg w-full p-6 relative">
             <button onClick={() => {setIsAIModalOpen(false); setAiError('');}} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-800 rounded-full transition-colors"><X size={20}/></button>
             <div className="mb-6 pr-8">
               <h2 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2"><Wand2 size={20} className="text-emerald-600" /> AI Auto-Fill</h2>
-              <p className="text-sm text-slate-500 mt-1">Paste ticket text or upload a document/screenshot. The AI will extract the data into your form.</p>
+              <p className="text-sm text-slate-500 mt-1">Paste ticket text or upload a screenshot (JPG/PNG). The AI will extract the data into your form.</p>
             </div>
             
             {aiError && (
@@ -656,23 +617,21 @@ const GeneratorView = ({ settings }) => {
               <textarea 
                 value={aiInputText}
                 onChange={e => setAiInputText(e.target.value)}
-                placeholder="Paste raw itinerary text here (e.g., from an email)..."
+                placeholder="Paste raw itinerary text here..."
                 className="w-full h-32 px-3 py-2 text-sm border border-slate-300 rounded-sm focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-colors resize-none"
               />
               
               <div className="flex items-center gap-4 my-2">
                 <div className="h-px bg-slate-200 flex-1"></div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">OR UPLOAD FILE</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">OR UPLOAD IMAGE</span>
                 <div className="h-px bg-slate-200 flex-1"></div>
               </div>
 
               <div className="border-2 border-dashed border-slate-300 rounded-md p-6 text-center hover:bg-slate-50 transition-colors relative bg-slate-50/50">
-                {/* Now accepts PDF natively along with images */}
-                <input type="file" accept="image/png, image/jpeg, image/webp, application/pdf" onChange={handleAIFileUpload} disabled={isAiLoading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleAIFileUpload} disabled={isAiLoading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
                 <div className="flex flex-col items-center gap-2 text-slate-500">
-                  <FileBadge2 size={24} className="text-slate-400" />
-                  <span className="text-sm font-medium text-slate-700">Click or drag PDF/Screenshot here</span>
-                  <span className="text-xs text-slate-400">PDF, JPG, PNG, WEBP</span>
+                  <ImageIcon size={24} className="text-slate-400" />
+                  <span className="text-sm font-medium text-slate-700">Click or drag screenshot here</span>
                 </div>
               </div>
             </div>
@@ -687,7 +646,6 @@ const GeneratorView = ({ settings }) => {
         </div>
       )}
 
-      {/* Forms Area */}
       <div className={`flex-1 p-6 md:p-8 overflow-y-auto pb-32 ${isPreviewOpen ? 'hidden md:block md:w-1/2' : 'w-full'}`}>
         <div className="flex justify-between items-end mb-8">
           <div>
@@ -709,7 +667,6 @@ const GeneratorView = ({ settings }) => {
         </Button>
 
         <div className="space-y-8 max-w-2xl">
-          {/* Core Booking Info */}
           <Card className="p-6">
             <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
               <FileText size={18} className="text-slate-400" />
@@ -721,7 +678,6 @@ const GeneratorView = ({ settings }) => {
             </div>
           </Card>
 
-          {/* Passengers */}
           <Card className="p-6 bg-slate-50 border-slate-200">
             <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-2">
               <div className="flex items-center gap-2">
@@ -756,7 +712,6 @@ const GeneratorView = ({ settings }) => {
             </div>
           </Card>
 
-          {/* Flight Segments */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2">
@@ -781,7 +736,7 @@ const GeneratorView = ({ settings }) => {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mb-4">
-                    <div className="flex flex-col gap-1.5 mb-4 w-full">
+                    <div className="flex flex-col gap-1.5 mb-4">
                       <label className="text-xs font-semibold tracking-wide text-slate-600 uppercase">Airline Name</label>
                       <input 
                         type="text" 
@@ -796,6 +751,11 @@ const GeneratorView = ({ settings }) => {
                       </datalist>
                     </div>
                     <Input label="Flight Number" placeholder="e.g. TG575" value={seg.flightNo} onChange={e => updateArrayItem('segments', idx, 'flightNo', e.target.value)} />
+                    
+                    <div className="col-span-1 md:col-span-2">
+                      <label className="block text-xs font-semibold tracking-wide text-slate-600 uppercase mb-2">Airline Logo (Optional)</label>
+                      <input type="file" accept="image/*" onChange={(e) => handleAirlineLogoUpload(e, idx)} className="text-xs w-full text-slate-500 file:mr-4 file:py-1 file:px-3 file:border-0 file:rounded-sm file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer" />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 mt-4">
@@ -835,53 +795,10 @@ const GeneratorView = ({ settings }) => {
               ))}
             </div>
           </Card>
-
-          {/* Fare Details */}
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
-              <FileText size={18} className="text-slate-400" />
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">Fare & Pricing</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Input label="Currency" placeholder="USD" value={ticketData.fareDetails?.currency || ''} onChange={e => updateFareField('currency', e.target.value)} />
-              <Input label="Base Fare" placeholder="450.00" value={ticketData.fareDetails?.baseFare || ''} onChange={e => updateFareField('baseFare', e.target.value)} />
-              <Input label="Taxes" placeholder="85.50" value={ticketData.fareDetails?.taxes || ''} onChange={e => updateFareField('taxes', e.target.value)} />
-              <Input label="Total" placeholder="535.50" value={ticketData.fareDetails?.total || ''} onChange={e => updateFareField('total', e.target.value)} />
-            </div>
-          </Card>
-
-          {/* Important Notes */}
-          <Card className="p-6">
-             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-2">
-                <AlertCircle size={18} className="text-slate-400" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">Important Information</h3>
-              </div>
-              <button onClick={addImportantNote} className="text-xs font-semibold text-[color:var(--agency-primary)] hover:underline">
-                + Add Note
-              </button>
-            </div>
-            <div className="space-y-3">
-              {ticketData.importantNotes.map((note, idx) => (
-                <div key={idx} className="flex gap-2 items-start">
-                  <textarea 
-                    value={note}
-                    onChange={e => handleImportantNoteChange(idx, e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-sm focus:outline-none focus:border-slate-800 transition-colors resize-none h-16"
-                  />
-                  <button onClick={() => removeImportantNote(idx)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-sm shrink-0">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Card>
         </div>
       </div>
 
-      {/* Live Preview Panel */}
       <div className={`fixed inset-0 z-50 md:relative md:z-auto bg-slate-800 md:bg-slate-200 md:flex-1 h-full md:border-l border-slate-300 flex flex-col transition-transform duration-300 ${isPreviewOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
-        
         <div className="bg-slate-900 text-white p-4 flex justify-between items-center md:hidden">
           <span className="font-bold">Document Preview</span>
           <button onClick={() => setIsPreviewOpen(false)} className="p-2"><X size={20} /></button>
@@ -901,18 +818,17 @@ const GeneratorView = ({ settings }) => {
   );
 };
 
-const TicketDocument = ({ settings, data, isPrintMode = false }) => {
+const TicketDocument = ({ settings, data }) => {
   return (
     <div 
-      className={`bg-white shadow-2xl print:shadow-none w-full max-w-[210mm] text-slate-800 relative ${isPrintMode ? 'min-h-0 h-auto overflow-visible' : 'min-h-[297mm] overflow-hidden'}`}
+      className="bg-white shadow-2xl print:shadow-none w-full max-w-[210mm] min-h-[297mm] text-slate-800 overflow-hidden relative"
       style={{ fontFamily: "var(--agency-font)", printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
     >
       <div className="p-10 md:p-12">
-        {/* Header */}
         <div className="flex flex-row justify-between items-start border-b-[3px] pb-6 mb-8" style={{ borderColor: 'var(--agency-primary)' }}>
           <div className="w-1/2">
             {settings.agencyLogo ? (
-               <img src={settings.agencyLogo} alt="Agency Logo" className="max-h-24 object-contain mix-blend-multiply" />
+               <img src={settings.agencyLogo} alt="Agency Logo" className="max-h-36 object-contain mix-blend-multiply" />
             ) : (
                <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: 'var(--agency-primary)' }}>
                  {settings.agencyName}
@@ -930,7 +846,6 @@ const TicketDocument = ({ settings, data, isPrintMode = false }) => {
           </div>
         </div>
 
-        {/* Booking Summary */}
         <div className="mb-8 border border-slate-200 rounded-sm overflow-hidden">
           <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200 bg-slate-50">
              <div className="p-4">
@@ -948,8 +863,7 @@ const TicketDocument = ({ settings, data, isPrintMode = false }) => {
           </div>
         </div>
 
-        {/* Passengers */}
-        <div className="mb-10 page-break-inside-avoid">
+        <div className="mb-10">
           <h3 className="text-sm font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-slate-200 pb-2" style={{ color: 'var(--agency-primary)' }}>
             <User size={16} /> Passenger Information
           </h3>
@@ -973,7 +887,6 @@ const TicketDocument = ({ settings, data, isPrintMode = false }) => {
           </table>
         </div>
 
-        {/* Flight Itinerary */}
         <div className="mb-10">
           <h3 className="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-slate-200 pb-2" style={{ color: 'var(--agency-primary)' }}>
             <Plane size={16} /> Flight Itinerary
@@ -981,7 +894,7 @@ const TicketDocument = ({ settings, data, isPrintMode = false }) => {
           
           <div className="space-y-6">
             {data.segments.map((seg, idx) => (
-              <div key={idx} className="relative page-break-inside-avoid">
+              <div key={idx} className="relative">
                 {idx > 0 && (
                   <div className="absolute -top-6 left-8 h-6 border-l-2 border-dashed border-slate-300"></div>
                 )}
@@ -1047,42 +960,18 @@ const TicketDocument = ({ settings, data, isPrintMode = false }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 page-break-inside-avoid">
-          {/* Fare & Pricing */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-slate-200 pb-2" style={{ color: 'var(--agency-primary)' }}>
-              <FileText size={16} /> Fare Details
-            </h3>
-            <div className="bg-slate-50 p-4 border border-slate-200 rounded-sm">
-              <div className="flex justify-between items-center text-sm mb-2 text-slate-600">
-                <span>Base Fare</span>
-                <span className="font-medium">{data.fareDetails?.currency} {data.fareDetails?.baseFare || '0.00'}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm mb-2 text-slate-600">
-                <span>Taxes & Fees</span>
-                <span className="font-medium">{data.fareDetails?.currency} {data.fareDetails?.taxes || '0.00'}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm font-bold border-t border-slate-200 pt-2 mt-2 text-slate-900">
-                <span>Total Amount</span>
-                <span style={{ color: 'var(--agency-primary)' }}>{data.fareDetails?.currency} {data.fareDetails?.total || '0.00'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Important Info */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-widest mb-3 text-slate-500 flex items-center gap-2 border-b border-slate-200 pb-2">
-              <AlertCircle size={16} /> Important Information
-            </h3>
-            <ul className="text-xs text-slate-600 space-y-2 pl-1">
-              {(data.importantNotes || []).map((note, idx) => (
-                <li key={idx} className="flex gap-2 leading-relaxed">
-                  <span className="font-bold" style={{ color: 'var(--agency-primary)' }}>•</span>
-                  {note}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="mt-8">
+           <h3 className="text-xs font-bold uppercase tracking-widest mb-3 text-slate-500 flex items-center gap-2">
+            <AlertCircle size={14} /> Important Information
+          </h3>
+          <ul className="text-xs text-slate-600 space-y-2 pl-1">
+            {data.importantNotes.map((note, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span className="font-bold" style={{ color: 'var(--agency-primary)' }}>•</span>
+                {note}
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="mt-16 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400 uppercase tracking-widest font-bold">
