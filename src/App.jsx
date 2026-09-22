@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 // --- Supabase Initialization ---
-const supabaseUrl = 'https://szhltfawxvkouavvxhzb.supabase.co/rest/v1'; 
+const supabaseUrl = 'https://szhltfawxvkouavvxhzb.supabase.co'; 
 const supabaseKey = 'sb_publishable_qTryF-iKLsMRJy7-pDdAwg_2TBQnu99'; 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
