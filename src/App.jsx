@@ -6,8 +6,8 @@ import {
 } from 'lucide-react';
 
 // --- Supabase Initialization ---
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseUrl = 'https://zzndxcavmancqbkxuuzz.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6bmR4Y2F2bWFuY3Fia3h1dXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwNTM1MDgsImV4cCI6MjEwNTYyOTUwOH0.TsTHmUtgbYxwSVNbYNatcSa-6V9_JCpzFKhVAAtXliU';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const DEFAULT_SETTINGS = {
@@ -530,7 +530,7 @@ const GeneratorView = ({ settings }) => {
     setIsAiLoading(true);
     setAiError('');
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
+      const apiKey = 'AIzaSyCF6MIvflCJTWueYWwpPnOW5cTyWsaZS3c'; 
       // Updated to 1.5-flash which natively handles images AND PDFs inline
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       
